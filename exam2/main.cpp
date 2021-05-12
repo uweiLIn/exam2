@@ -18,6 +18,8 @@
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
 
+using namespace std;
+
 WiFiInterface *wifi;
 InterruptIn btnRecord(USER_BUTTON);
 constexpr int kTensorArenaSize = 60 * 1024;
@@ -31,31 +33,71 @@ volatile int arrivedcount = 0;
 volatile bool closed = false;
 void ml();
 void mqtt();
+void record();
+void stopRecord();
+void startRecord();
+void classify_up();
+
+int PredictGesture(float* output);
+
 const char* topic = "Mbed";
 Thread mqtt_thread(osPriorityHigh);
 EventQueue mqtt_queue;
+int flag = true;
 
-
-BufferedSerial pc(USBTX, USBRX);
+BuferedSerial pc(USBTX, USBRX);
 void accelerator_cap(Arguments *in, Reply *out);
-int PredictGesture(float* output);
-
+void messageArrived(MQTT::MessageData& md);
+void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client);
 RPCFunction Accelerator_cap(&accelerator_cap, "Accelerator_cap");  
 
 
-
-
-
 int16_t pDataXYZ[3] = {0};
+int16_t DataXYZ[3] = {0};
+int16_t iniXYZ[3] = {0};
 int idR[32] = {0};
 int indexR = 0;
 
 Thread thread_gesture;
 Thread thread_mqtt;
+Thread thread_classify;
 
+int main () {
 
+  
+    //printf("hello");
+    thread_mqtt.start(mqtt);
+    thread_gesture.start(ml);
+    thread_classify.start(classify_up);
+    
+    char buf[256], outbuf[256];
+
+    //BSP_ACCELERO_Init();
+
+    FILE *devin = fdopen(&pc, "r");
+    FILE *devout = fdopen(&pc, "w");
+
+    while(1) {
+        memset(buf, 0, 256);
+        for (int i = 0; ; i++) {
+            char recv = fgetc(devin);
+            if (recv == '\n') {
+                printf("\r\n");
+                break;
+            }
+            buf[i] = fputc(recv, devout);
+        }
+        //Call the static call method on the RPC class
+        RPC::call(buf, outbuf);
+        printf("%s\r\n", outbuf);
+    }
+
+}
 void record(void) {
    BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+   for (i = 0; i < 3; i++) {
+     DataXYZ[i] = pDataXYZ[i];
+   }
    printf("%d, %d, %d\n", pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]);
 
 }
@@ -79,9 +121,12 @@ void acclerator_cap (Arguments *in, Reply *out) {
 
     printf("Start accelerometer init\n");
     BSP_ACCELERO_Init();
+    BSP_ACCELERO_AccGetXYZ(iniXYZ);
     t.start(callback(&queue, &EventQueue::dispatch_forever));
-    btnRecord.fall(queue.event(startRecord));
-    btnRecord.rise(queue.event(stopRecord));
+    if (flag) {
+      btnRecord.fall(queue.event(startRecord));
+      btnRecord.rise(queue.event(stopRecord));
+    }
     
 }
 int PredictGesture(float* output) {
@@ -337,40 +382,24 @@ void mqtt() {
     mqttNetwork.disconnect();
     printf("Successfully closed!\n");
 
-    return 0;
+    return ;
 
 }
 
-
-int main () {
-
-    
-
-    //printf("hello");
-    thread_mqtt.start(mqtt);
-    thread_gesture.start(ml);
-    //thread_tilt.start(tilt);
-    
-    char buf[256], outbuf[256];
-
-    //BSP_ACCELERO_Init();
-
-    FILE *devin = fdopen(&pc, "r");
-    FILE *devout = fdopen(&pc, "w");
-
-    while(1) {
-        memset(buf, 0, 256);
-        for (int i = 0; ; i++) {
-            char recv = fgetc(devin);
-            if (recv == '\n') {
-                printf("\r\n");
-                break;
-            }
-            buf[i] = fputc(recv, devout);
+void classify_up(){
+   
+   int num = 0;
+   int event_up = 0;
+    while(1){
+        if (DataXYZ[2] > iniXYZ[2]) {
+          printf("Object is moving upwardly !");
+          event_up++;
         }
-        //Call the static call method on the RPC class
-        RPC::call(buf, outbuf);
-        printf("%s\r\n", outbuf);
+        if (num > 30) {
+          num = 0;
+          flag = false;
+        }
+        num++; 
+        ThisThread::sleep_for(100ms);
     }
-
 }
