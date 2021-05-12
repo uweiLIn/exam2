@@ -98,7 +98,7 @@ int main () {
 }
 void record(void) {
    BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-   for (i = 0; i < 3; i++) {
+   for (int i = 0; i < 3; i++) {
      DataXYZ[i] = pDataXYZ[i];
    }
    printf("%d, %d, %d\n", pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]);
