@@ -57,6 +57,9 @@ int16_t DataXYZ[3] = {0};
 int16_t iniXYZ[3] = {0};
 int idR[32] = {0};
 int indexR = 0;
+int total = 0;
+int num = 0;
+int event_up = 0;
 
 Thread thread_gesture;
 Thread thread_mqtt;
@@ -388,8 +391,9 @@ void mqtt() {
 
 void classify_up(){
    
-   int num = 0;
-   int event_up = 0;
+  //  int num = 0;
+  //  int total = 0;
+  //  int event_up = 0;
     while(1){
         if (DataXYZ[2] > iniXYZ[2]) {
           printf("Object is moving upwardly !");
@@ -400,6 +404,8 @@ void classify_up(){
           flag = false;
         }
         num++; 
+        total++;
         ThisThread::sleep_for(100ms);
     }
+  
 }
